@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# tested on ubuntu 20.04
+
+case "$2" in
+        vpn-up)
+                #printenv | logger -t vpn-up
+
+                # disable case matching
+                shopt -s nocasematch
+
+                # set string which must be included in VPN profile name
+                VPN_PROFILE_NAME_REGEXP=".*(some|regexp).*"
+
+                # domains to be resolved via connection
+                export SEARCH_DOMAINS=(somedomain.com google.com)
+
+                # nameservers for the connection
+                export NAMESERVERS=($VPN_IP4_NAMESERVERS)
+
+                # run resolvectl, modify dns settings for connection
+                if [[ $CONNECTION_ID =~ $VPN_PROFILE_NAME_REGEXP ]] && [[ -x /usr/bin/resolvectl ]]; then
+                        resolvectl dns $VPN_IP_IFACE ${NAMESERVERS[@]}
+                        resolvectl domain $VPN_IP_IFACE ${SEARCH_DOMAINS[@]}
+
+                # fallback to systemd-resolve (ubuntu 18.04)
+                elif [[ $CONNECTION_ID =~ $VPN_PROFILE_NAME_REGEXP ]] && [[ -x /usr/bin/systemd-resolve ]]; then
+                        CMDOPTS=$(/usr/bin/printf "--set-dns %s " ${NAMESERVERS[@]})$(/usr/bin/printf "--set-domain %s " ${SEARCH_DOMAINS[@]})
+                        systemd-resolve --interface $VPN_IP_IFACE $CMDOPTS
+
+                else
+                        echo "Configuration not supported"|logger -t vpn-up
+                fi
+        ;;
+esac
